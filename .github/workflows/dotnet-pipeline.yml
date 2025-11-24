@@ -1,52 +1,71 @@
-name: My PipePlan
+name: .NET CI Pipeline
 
+# Когда запускать
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Переменные
 env:
   DOTNET_VERSION: '6.0.x'
 
 jobs:
-  build:
+  # Джоба сборки и тестирования
+  build-and-test:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # Шаг 1: Забираем код
+    - name: Checkout code
+      uses: actions/checkout@v4
       
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+    # Шаг 2: Настраиваем .NET
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    # Шаг 3: Восстанавливаем зависимости
+    - name: Restore dependencies
+      run: dotnet restore
       
-      - name: Build
-        run: dotnet build
+    # Шаг 4: Собираем проект
+    - name: Build project
+      run: dotnet build --configuration Release --no-restore
+      
+    # Шаг 5: Запускаем тесты
+    - name: Run tests
+      run: dotnet test --no-build --verbosity normal
+      
+    # Шаг 6: Публикуем приложение
+    - name: Publish application
+      run: dotnet publish --configuration Release --no-build --output ./publish
+      
+    # Шаг 7: Сохраняем собранное приложение
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-app
+        path: publish/
+        retention-days: 7
 
-  test:
+  # Джоба проверки качества кода (опционально)
+  code-quality:
     runs-on: ubuntu-latest
-    needs: build  # Ждет завершения build
+    needs: build-and-test
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-      
-      - name: Test
-        run: dotnet test
-
-  deployment:
-    runs-on: ubuntu-latest
-    needs: test  # Ждет завершения test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-      
-      - name: Deployment
-        run: dotnet publish -c Release -o ./publish
-      
-      - name: Show result
-        run: echo "🎉 Deployment completed!"
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Run code analysis
+      run: |
+        dotnet build --configuration Release /warnaserror
+        echo "✅ Code quality check passed!"
